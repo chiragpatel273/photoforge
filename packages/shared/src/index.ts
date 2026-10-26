@@ -110,7 +110,9 @@ export const orderSchema = z.object({
   idempotencyKey: z.string().uuid(),
 });
 
-export type ProductSize = z.infer<typeof orderSchema>['size'];
+export type OrderRequest = z.infer<typeof orderSchema>;
+
+export type ProductSize = OrderRequest['size'];
 
 export { priceCents, sizes, resolutionDpi, jobOptions } from './domain';
 

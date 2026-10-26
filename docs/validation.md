@@ -95,3 +95,39 @@ Added a pinned Prettier dependency, `.prettierrc.json`, `.prettierignore`, `.edi
 ## Local object inspection — 2026-10-24
 
 Enabled the local MinIO browser console with `--console-address :9001` and a `127.0.0.1:9001:9001` port mapping. Resolved Compose assertions confirm the console command/mapping, unchanged S3 API port 9000, and preservation of the existing `s3-data` volume. README documents the console login variable names and object key layout. The console has not been opened or runtime-verified from the agent environment; users must recreate the MinIO container to apply the configuration. Production Compose and private bucket access were not changed.
+
+## Pre-publication review fixes — 2026-10-24
+
+Fixed editor save serialization so synchronous document validation errors release the pending save and corrected input can be saved. Regression tests cover validation recovery, network retry, concurrent callers, changes during a request, and switching books before a response arrives. Checkout now recovers a concurrent unique-key conflict by reading the committed order and checking its owner and request parameters before returning it. Unit tests cover the race, incompatible retries, ownership and unrelated database failures; a real concurrent API integration case was also added.
+
+The Jest scripts enable VM modules for ESM dependencies, and ts-jest uses isolated transpilation. A separate strict test TypeScript configuration preserves test type checking. Fixed the empty catch lint finding. CI now checks formatting; local setup, Docker and CI use the existing lockfile with frozen installs. Docker caches manifest installation separately from source changes and shares the prepared Corepack cache with the runtime user. Deployment tags include the SHA, workflow run and attempt, while services still deploy by digest. Terraform state, local inputs and provider directories are excluded from Git and Docker contexts.
+
+Verified using the installed dependencies:
+
+- Shared package, API and worker compilation passed.
+- Web and test strict TypeScript checks passed.
+- ESLint, repository-wide Prettier checks and `git diff --check` passed.
+- Jest: **24 passed, 9 integration tests skipped**, across 7 passing suites and 2 skipped suites. Skips require PostgreSQL/Redis and explicit `RUN_INTEGRATION=1`; they are not passing integration results.
+- Compose configuration validation passed without contacting the daemon.
+- Every workspace dependency specifier matches the committed lockfile. A fresh frozen dependency install was not performed in this restricted environment.
+
+The full production build reached Next.js/Turbopack, then failed because the sandbox denies the internal port binding used by CSS processing (`Operation not permitted`). This is not a successful frontend production build. Docker builds, real integration tests, browser tests/screenshots, Terraform validation and AWS deployment were not verified here. The host's pnpm 12 also attempted an automatic dependency check that could not acquire a read-only store lock; the project pins pnpm 10.28.0, which should be used for reproducible installation and release checks.
+
+Before publication, run the following on a machine with Docker and network access:
+
+```bash
+corepack pnpm install --frozen-lockfile
+corepack pnpm db:generate
+corepack pnpm --filter @photoforge/shared build
+corepack pnpm typecheck
+corepack pnpm format:check
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm build
+docker compose up --build -d --wait --wait-timeout 300
+docker compose exec -T api pnpm test:integration tests/api.integration.test.ts tests/jobs.integration.test.ts
+corepack pnpm exec playwright install chromium
+corepack pnpm test:e2e
+```
+
+Review the actual screenshots in `test-results/` before copying selected captures to `docs/screenshots/`. A license has not been selected; no license or copyright attribution was invented during this review.

@@ -10,3 +10,15 @@ coverage
 test-results
 playwright-report
 .local
+
+# Terraform state and environment-specific inputs may contain secrets.
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+!*.example.tfvars
+!*.example.tfvars.json
+**/*.tfplan
+**/crash.log
+**/crash.*.log

@@ -6,7 +6,7 @@ No AWS resources have been provisioned. The Terraform source is an opt-in deploy
 
 ## Provisioning
 
-1. Complete the checks in `validation.md`, commit a pnpm lockfile, pin image dependencies and use frozen installs. Run `terraform fmt -check`, `terraform init`, `terraform validate`, and a reviewed `terraform plan` in `infrastructure/aws`. Configure an encrypted remote state backend and locking before applying. State/output access must be restricted.
+1. Complete the checks in `validation.md`, use the committed pnpm lockfile with frozen installs and review pinned image dependencies. Run `terraform fmt -check`, `terraform init`, `terraform validate`, and a reviewed `terraform plan` in `infrastructure/aws`. Configure an encrypted remote state backend and locking before applying. State/output access must be restricted.
 2. Prepare a dedicated Secrets Manager secret ARN for application configuration; no values are in Terraform. Set region, unique bucket name, exact HTTPS origin and secret ARN through approved tfvars. Review engine/AMI availability and instance costs in the selected region. Apply only after explicit approval.
 3. The stack creates a VPC/public application subnet, two private DB subnets, private encrypted RDS PostgreSQL, S3 with private access/encryption/CORS, ECR, EC2/IMDSv2, SSM role, CloudWatch log group/alarm and optional public-marketing-only CloudFront. There is no inbound SSH. Use Session Manager.
 4. Create a database application/migration role on the private RDS host from an authorized SSM session. Retrieve the managed RDS administrative credential through a separate administrative role, not the app instance role. Give the application role privileges for its own schema/database only. Test `sslmode=require` and RDS CA validation with the deployed driver.
@@ -22,7 +22,7 @@ The image contains all app roles and migration/test tooling to keep this MVP sim
 
 `ci.yml` performs install, Prisma generation, shared build, workspace type checks, ESLint, Jest and production build, then validates Compose and builds Docker. A separate job starts the complete Compose stack, runs real DB/Redis ownership/retry integration tests and the browser upload/export flow, and retains artifacts.
 
-`deploy.yml` is manual and targets the protected production environment. CI is a prerequisite reusable workflow. It never applies Terraform or provisions resources. Application dependencies currently require online resolution and a lockfile must be generated/committed before release.
+`deploy.yml` is manual and targets the protected production environment. CI is a prerequisite reusable workflow. It never applies Terraform or provisions resources. Application builds install the committed lockfile with frozen resolution. Each image tag includes the commit SHA, workflow run ID and run attempt, so rerunning a release does not overwrite an immutable ECR tag. Services deploy by image digest; record the previous digest for rollback.
 
 The deployment script writes a mode-600 environment file from Secrets Manager without echoing it. ECR digest selects the exact built image. API/worker output goes to `/photoforge/services` in CloudWatch with 14-day retention. Local Redis data, Caddy state and certificates persist in volumes. RDS has seven-day backups; test restoration to a disposable instance before considering recovery verified.
 

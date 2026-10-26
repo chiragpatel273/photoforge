@@ -239,6 +239,20 @@ suite('real PostgreSQL and Redis API boundaries', () => {
     ).toBe(404);
   });
 
+  test('concurrent checkout retries return one persisted order', async () => {
+    const idempotencyKey = crypto.randomUUID();
+    const request = {
+      method: 'POST' as const,
+      url: '/orders',
+      headers: { cookie },
+      payload: { bookId: id, size: 'square', pageCount: 2, idempotencyKey },
+    };
+    const responses = await Promise.all([app.inject(request), app.inject(request)]);
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 201]);
+    expect(responses[0]!.json().id).toBe(responses[1]!.json().id);
+    expect(await infra.db.order.count({ where: { idempotencyKey } })).toBe(1);
+  });
+
   test('logout invalidates a previously valid signed session', async () => {
     expect(
       (

@@ -11,7 +11,11 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        tsconfig: { ...require('./tsconfig.base.json').compilerOptions, jsx: 'react-jsx' },
+        tsconfig: {
+          ...require('./tsconfig.base.json').compilerOptions,
+          jsx: 'react-jsx',
+          isolatedModules: true,
+        },
         diagnostics: true,
       },
     ],

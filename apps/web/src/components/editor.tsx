@@ -3,14 +3,13 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Book,
   Asset,
   templates,
   templateDocument,
-  documentSchema,
   resolutionDpi,
   MAX_UPLOAD,
   Element,
@@ -40,6 +39,7 @@ import {
 } from 'lucide-react';
 import { api, post } from '@/lib/api';
 import { useEditor } from '@/lib/editor-store';
+import { createEditorSaver } from '@/lib/editor-save';
 import { Logo, Spinner, ErrorMessage } from './ui';
 
 const Canvas = dynamic(() => import('./canvas'), {
@@ -57,7 +57,6 @@ export function Editor({ id }: { id: string }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const inFlight = useRef<Promise<void> | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const book = useQuery({
     queryKey: ['book', id],
@@ -77,45 +76,27 @@ export function Editor({ id }: { id: string }) {
     if (book.data && useEditor.getState().bookId !== id) s.load(book.data);
   }, [book.data, id, s.load]);
 
-  const save = useCallback(async () => {
-    if (inFlight.current) return inFlight.current;
-    const run = async () => {
-      setSaving(true);
-      try {
-        while (true) {
-          const state = useEditor.getState();
-
-          if (state.bookId !== id || !state.document || state.sequence === state.savedSequence)
-            break;
-          const document = documentSchema.parse(state.document);
-          const sequence = state.sequence;
-          const result = await api<Book>(`/photobooks/${id}`, {
+  const save = useMemo(
+    () =>
+      createEditorSaver({
+        bookId: id,
+        read: useEditor.getState,
+        write: (bookId, input) =>
+          api<Book>(`/photobooks/${bookId}`, {
             method: 'PUT',
-            body: JSON.stringify({
-              title: state.title,
-              document,
-              revision: state.revision,
-            }),
-          });
-
-          if (useEditor.getState().bookId !== id) break;
-          useEditor.getState().acknowledge(result.revision, sequence);
-        }
-        setError('');
-        await client.invalidateQueries({ queryKey: ['books'] });
-      } catch (e) {
-        setError((e as Error).message);
-        throw e;
-      } finally {
-        setSaving(false);
-        inFlight.current = null;
-      }
-    };
-
-    inFlight.current = run();
-
-    return inFlight.current;
-  }, [id, client]);
+            body: JSON.stringify(input),
+          }),
+        onStart: () => setSaving(true),
+        onSuccess: async () => {
+          setError('');
+          await client.invalidateQueries({ queryKey: ['books'] });
+        },
+        onError: (error) =>
+          setError(error instanceof Error ? error.message : 'Unable to save your book'),
+        onSettled: () => setSaving(false),
+      }),
+    [id, client],
+  );
 
   useEffect(() => {
     if (s.bookId !== id || s.sequence === s.savedSequence) return;
@@ -273,7 +254,9 @@ export function Editor({ id }: { id: string }) {
     try {
       await save();
       router.push(path);
-    } catch {}
+    } catch {
+      // The save operation displays the error; keep the editor open for retry.
+    }
   }
 
   async function exportBook() {

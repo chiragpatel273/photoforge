@@ -9,3 +9,15 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .local/
+
+# Terraform state and environment-specific inputs may contain secrets.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.example.tfvars
+!*.example.tfvars.json
+*.tfplan
+crash.log
+crash.*.log

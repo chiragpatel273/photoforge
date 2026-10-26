@@ -4,7 +4,7 @@
 
 Create a private guest workspace, choose a template, upload photographs directly to object storage, arrange pages in a Konva editor, save a versioned document, and request a downloadable PDF. A deliberately simulated checkout records orders without collecting payment details or shipping products.
 
-> Implementation is present; the portfolio MVP is **not yet release-verified**. This development environment could not reach npm or the Docker daemon. Six dependency-independent tests, strict checking of the standalone pricing/password modules, TypeScript syntax checks, Compose configuration checks, and an actual SQL migration/relational smoke check passed. Dependency installation, full type checks, lint, Jest/integration tests, browser verification, production builds, and AWS deployment remain verification gates. See [the exact validation record](docs/validation.md). No cloud resources were created.
+> Implementation is present; the portfolio MVP is **not yet release-verified**. Local type checks, lint and unit tests are documented in [the validation record](docs/validation.md). Docker integration tests, browser verification, production builds and AWS deployment remain separate release gates. No cloud resources were created.
 
 ## Local startup
 
@@ -134,7 +134,7 @@ Install dependencies before running these commands. Generated output, local secr
 
 ```bash
 corepack enable
-corepack pnpm install --no-frozen-lockfile
+corepack pnpm install --frozen-lockfile
 corepack pnpm db:generate
 corepack pnpm --filter @photoforge/shared build
 corepack pnpm typecheck
@@ -143,13 +143,13 @@ corepack pnpm test
 corepack pnpm build
 ```
 
-**Commit the generated `pnpm-lock.yaml` after the first successful install** and change CI/Docker installation to `--frozen-lockfile`. A lockfile could not be generated offline, so reproducible dependency resolution is an explicit outstanding release gate.
+The committed `pnpm-lock.yaml` pins dependency resolution. Local setup, Docker and CI use `--frozen-lockfile`; update the lockfile intentionally when changing dependencies. Use the pinned pnpm 10.28.0 and Node.js 24.
 
 For hot reload, keep dependencies running through Compose, stop its app processes and run the workspace dev scripts inside the service containers, or explicitly publish database/Redis ports to **127.0.0.1** in a private development override. Host `.env` defaults use localhost and do not connect to unpublished Compose databases automatically. Do not publish these ports on a production interface.
 
 ```bash
 # Real Fastify/PostgreSQL/Redis tests inside the configured service container:
-docker compose exec -e RUN_INTEGRATION=1 api pnpm exec jest --runInBand \
+docker compose exec -T api pnpm test:integration \
   tests/api.integration.test.ts tests/jobs.integration.test.ts
 
 # Browser test from the host, with services running:
@@ -196,7 +196,7 @@ There is no Stripe integration, real payment collection, fulfillment, public fil
 
 ## Known limitations and next work
 
-Complete the blocked dependency/build/runtime verification first. Then capture real screenshots, address browser findings, commit a dependency lock, validate Terraform against the selected AWS account, and perform a separately approved deployment/smoke test.
+Complete the remaining production build and Docker/browser verification first. Then capture real screenshots, address browser findings, validate Terraform against the selected AWS account, and perform a separately approved deployment/smoke test.
 
 The MVP uses single-instance EC2 and local persistent Redis, standard Latin PDF fonts, RGB output, simple rectangular crops, one active editor per document revision, and a bounded undo history. CMYK, ICC embedding, PDF/X certification, arbitrary Unicode fonts, collaborative editing, password recovery/email verification, malware scanning, automated member asset garbage collection, and real print fulfillment are not implemented. The canvas has keyboard controls and form labels, but still needs a screen-reader usability audit. A fully accessible non-canvas editing alternative remains future work.
 

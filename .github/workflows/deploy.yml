@@ -28,7 +28,7 @@ jobs:
           context: .
           file: infrastructure/Dockerfile
           push: true
-          tags: ${{ steps.login.outputs.registry }}/photoforge:${{ github.sha }}
+          tags: ${{ steps.login.outputs.registry }}/photoforge:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Package runtime configuration
         run: tar -czf /tmp/photoforge-runtime.tar.gz -C infrastructure compose.production.yml Caddyfile deploy.sh
       - name: Upload configuration and deploy through SSM

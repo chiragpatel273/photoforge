@@ -8,10 +8,10 @@
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "build": "pnpm --filter @photoforge/shared build && pnpm --filter @photoforge/api build && pnpm --filter @photoforge/worker build && pnpm --filter @photoforge/web build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.tests.json",
     "lint": "eslint .",
-    "test": "jest --runInBand",
-    "test:integration": "RUN_INTEGRATION=1 jest --runInBand",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:integration": "RUN_INTEGRATION=1 node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "playwright test",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
