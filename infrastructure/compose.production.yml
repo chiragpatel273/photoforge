@@ -1,0 +1,106 @@
+name: photoforge
+x-app: &app
+  image: ${IMAGE:?Set IMAGE to an immutable ECR image digest}
+  init: true
+  restart: unless-stopped
+  env_file: .env
+  environment: &app-env
+    NODE_ENV: production
+    REDIS_URL: redis://redis:6379
+    API_INTERNAL_URL: http://api:4000
+  networks: [private, edge]
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: ${S3_REGION:?Set region}
+      awslogs-group: /photoforge/services
+      awslogs-create-group: 'false'
+      tag: '{{.Name}}'
+services:
+  migrate:
+    <<: *app
+    restart: 'no'
+    command: [sh, -c, 'pnpm db:migrate && pnpm db:seed']
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    volumes: [redis-data:/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    <<: *app
+    command: [pnpm, --filter, '@photoforge/api', start]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  worker:
+    <<: *app
+    command: [pnpm, --filter, '@photoforge/worker', start]
+    stop_grace_period: 120s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, infrastructure/worker-health.cjs]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+  web:
+    <<: *app
+    environment:
+      <<: *app-env
+      PORT: '3000'
+    command: [pnpm, --filter, '@photoforge/web', start]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  proxy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes: ['./Caddyfile:/etc/caddy/Caddyfile:ro', 'caddy-data:/data', 'caddy-config:/config']
+    networks: [edge]
+    depends_on:
+      web:
+        condition: service_healthy
+networks:
+  private:
+    internal: true
+  edge: {}
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

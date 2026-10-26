@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model User {
+  id             String       @id @default(uuid()) @db.Uuid
+  email          String       @unique
+  name           String
+  passwordHash   String?
+  isGuest        Boolean      @default(false)
+  sessionVersion Int          @default(0)
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+  books          Photobook[]
+  images         ImageAsset[]
+  orders         Order[]
+
+  @@index([expiresAt])
+}
+
+model Template {
+  id        String      @id
+  name      String
+  category  String
+  document  Json
+  createdAt DateTime    @default(now())
+  books     Photobook[]
+}
+
+model Photobook {
+  id         String          @id @default(uuid()) @db.Uuid
+  userId     String          @db.Uuid
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateId String
+  template   Template        @relation(fields: [templateId], references: [id])
+  title      String
+  status     String          @default("DRAFT")
+  revision   Int             @default(0)
+  document   Json
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  pages      PhotobookPage[]
+  images     ImageAsset[]
+  exports    ExportJob[]
+  items      OrderItem[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model PhotobookPage {
+  id        String    @id @db.Uuid
+  bookId    String    @db.Uuid
+  book      Photobook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  position  Int
+  content   Json
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([bookId, position])
+}
+
+model ImageAsset {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId       String    @db.Uuid
+  book         Photobook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  filename     String
+  mime         String
+  size         Int
+  originalKey  String
+  thumbnailKey String?
+  optimizedKey String?
+  status       String    @default("UPLOADING")
+  error        String?
+  width        Int?
+  height       Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([bookId, userId, status])
+}
+
+model ExportJob {
+  id        String    @id @default(uuid()) @db.Uuid
+  bookId    String    @db.Uuid
+  book      Photobook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  revision  Int
+  snapshot  Json
+  status    String    @default("QUEUED")
+  progress  Int       @default(0)
+  objectKey String?
+  error     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([bookId, revision])
+
+  @@index([status, createdAt])
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  userId         String      @db.Uuid
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idempotencyKey String      @unique @db.Uuid
+  status         String      @default("MOCK_CONFIRMED")
+  totalCents     Int
+  currency       String      @default("USD")
+  createdAt      DateTime    @default(now())
+  items          OrderItem[]
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model OrderItem {
+  id         String     @id @default(uuid()) @db.Uuid
+  orderId    String     @db.Uuid
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bookId     String?    @db.Uuid
+  book       Photobook? @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  title      String
+  size       String
+  pageCount  Int
+  priceCents Int
+  document   Json
+}

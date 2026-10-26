@@ -1,0 +1,16 @@
+# Generated files and local data
+**/node_modules/**
+**/dist/**
+**/.next/**
+.git/**
+.local/**
+coverage/**
+test-results/**
+playwright-report/**
+*.tsbuildinfo
+pnpm-lock.yaml
+.env
+.env.*
+
+# Applied migrations have checksums; keep their original contents.
+infrastructure/prisma/migrations/**

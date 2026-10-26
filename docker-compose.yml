@@ -1,0 +1,137 @@
+name: photoforge
+x-runtime: &runtime
+  build:
+    context: .
+    dockerfile: infrastructure/Dockerfile
+  init: true
+  restart: unless-stopped
+  env_file: .env
+  environment: &env
+    NODE_ENV: development
+    DATABASE_URL: postgresql://photoforge:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/photoforge
+    REDIS_URL: redis://redis:6379
+    S3_ENDPOINT: http://minio:9000
+    S3_PUBLIC_ENDPOINT: http://localhost:9000
+    S3_FORCE_PATH_STYLE: 'true'
+    API_INTERNAL_URL: http://api:4000
+  networks: [private, edge]
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: photoforge
+      POSTGRES_DB: photoforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U photoforge -d photoforge']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    restart: unless-stopped
+    volumes: [redis-data:/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  minio:
+    # Community-built image of the same release; upstream Docker Hub image is unavailable.
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-04-22T22-12-26Z@sha256:a4938f37f1be1841b8e7b627ad0207b265345fd0d063e42d7410c78af0e63e68
+    command: [server, /data, --console-address, ':9001']
+    restart: unless-stopped
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: ${WEB_ORIGIN:?Set WEB_ORIGIN}
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    volumes: [s3-data:/data]
+    networks: [private, edge]
+  storage-init:
+    <<: *runtime
+    command: [pnpm, exec, tsx, infrastructure/storage-init.ts]
+    restart: 'no'
+    depends_on:
+      minio:
+        condition: service_started
+  migrate:
+    <<: *runtime
+    command: [sh, -c, 'pnpm db:migrate && pnpm db:seed']
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    <<: *runtime
+    command: [pnpm, --filter, '@photoforge/api', start]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  worker:
+    <<: *runtime
+    command: [pnpm, --filter, '@photoforge/worker', start]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    stop_grace_period: 120s
+    healthcheck:
+      test: [CMD, node, infrastructure/worker-health.cjs]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+  web:
+    <<: *runtime
+    environment:
+      <<: *env
+      PORT: '3000'
+    command: [pnpm, --filter, '@photoforge/web', start]
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+networks:
+  private:
+    internal: true
+  edge: {}
+volumes:
+  postgres-data:
+  redis-data:
+  s3-data:

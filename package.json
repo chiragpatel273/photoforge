@@ -1,0 +1,61 @@
+{
+  "name": "photoforge",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm --filter @photoforge/shared build && pnpm --filter @photoforge/api build && pnpm --filter @photoforge/worker build && pnpm --filter @photoforge/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "jest --runInBand",
+    "test:integration": "RUN_INTEGRATION=1 jest --runInBand",
+    "test:e2e": "playwright test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx infrastructure/seed.ts",
+    "test:offline": "tsx tests/offline.test.ts",
+    "cleanup:guests": "tsx infrastructure/cleanup.ts",
+    "db:validate": "prisma validate",
+    "check:syntax": "node scripts/check-syntax.cjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:prisma": "prisma format",
+    "format:terraform": "terraform fmt -recursive infrastructure/aws"
+  },
+  "prisma": {
+    "schema": "infrastructure/prisma/schema.prisma",
+    "seed": "tsx infrastructure/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "typescript-eslint": "^8.48.0",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.3",
+    "tsx": "^4.20.0",
+    "prisma": "^6.19.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "@playwright/test": "^1.56.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "jest-environment-jsdom": "^30.2.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "sharp": "^0.34.4",
+    "pdf-lib": "^1.17.1",
+    "bullmq": "^5.63.0",
+    "ioredis": "^5.8.0",
+    "fastify": "^5.6.0",
+    "prettier": "3.6.2"
+  }
+}

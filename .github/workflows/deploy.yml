@@ -1,0 +1,53 @@
+name: Deploy approved AWS environment
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: photoforge-production
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+  release:
+    needs: validate
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login
+      - uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: .
+          file: infrastructure/Dockerfile
+          push: true
+          tags: ${{ steps.login.outputs.registry }}/photoforge:${{ github.sha }}
+      - name: Package runtime configuration
+        run: tar -czf /tmp/photoforge-runtime.tar.gz -C infrastructure compose.production.yml Caddyfile deploy.sh
+      - name: Upload configuration and deploy through SSM
+        env:
+          DEPLOY_BUCKET: ${{ vars.S3_BUCKET }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          ENV_SECRET: ${{ secrets.ENV_SECRET_ARN }}
+          IMAGE: ${{ steps.login.outputs.registry }}/photoforge@${{ steps.image.outputs.digest }}
+        run: |
+          aws s3 cp /tmp/photoforge-runtime.tar.gz "s3://$DEPLOY_BUCKET/deployment/$GITHUB_SHA.tar.gz"
+          python3 - <<'PYTHON'
+          import os,json,shlex
+          q=shlex.quote
+          commands=['set -eu','mkdir -p /opt/photoforge',f'aws s3 cp s3://{q(os.environ["DEPLOY_BUCKET"])}/deployment/{q(os.environ["GITHUB_SHA"])}.tar.gz /tmp/runtime.tar.gz','tar -xzf /tmp/runtime.tar.gz -C /opt/photoforge',f'IMAGE={q(os.environ["IMAGE"])} DEPLOY_SECRET_ARN={q(os.environ["ENV_SECRET"])} bash /opt/photoforge/deploy.sh']
+          open('/tmp/ssm.json','w').write(json.dumps({'commands':commands}))
+          PYTHON
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --parameters file:///tmp/ssm.json --query 'Command.CommandId' --output text)
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"
+      - name: Verify HTTPS readiness
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: curl --fail --retry 10 --retry-delay 5 "$APP_URL/api/ready"
