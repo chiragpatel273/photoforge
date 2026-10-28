@@ -4,11 +4,49 @@
 
 Create a private guest workspace, choose a template, upload photographs directly to object storage, arrange pages in a Konva editor, save a versioned document, and request a downloadable PDF. A deliberately simulated checkout records orders without collecting payment details or shipping products.
 
-> Implementation is present; the portfolio MVP is **not yet release-verified**. Local type checks, lint and unit tests are documented in [the validation record](docs/validation.md). Docker integration tests, browser verification, production builds and AWS deployment remain separate release gates. No cloud resources were created.
+**[Open the live demo](https://photoforge-chirag.duckdns.org)** · [Architecture](docs/architecture.md) · [API contracts](docs/api.md) · [Local setup](#local-startup)
+
+## Try the demo
+
+Open **https://photoforge-chirag.duckdns.org** and choose **Try the creative studio**. No registration or payment information is required.
+
+1. Create a photobook from a template.
+2. Upload a small JPEG, PNG or WebP photo and place it on a page.
+3. Add text, adjust the layout and save.
+4. Refresh to check persistence, then preview and request a PDF export.
+5. Download the completed PDF or explore mock checkout and order history.
+
+The demo is hosted temporarily on a small AWS EC2 instance. Availability may change, and image/PDF processing may be slow under load. Use sample photos; guest sessions last 24 hours, and demo data may be reset. Session expiry does not itself delete uploaded files.
+
+## Live AWS deployment
+
+The running demo uses a manually configured, single-server deployment:
+
+| Component      | Current demo                                                                       |
+| -------------- | ---------------------------------------------------------------------------------- |
+| Compute        | AWS EC2, Ubuntu 26.04 LTS, approximately 1 GB RAM plus 1 GB swap                   |
+| Application    | Prebuilt Docker image, with separate Next.js, Fastify and BullMQ worker containers |
+| Database       | PostgreSQL 17 container with a persistent Docker volume                            |
+| Queues/cache   | Redis container with persistence                                                   |
+| Photos/PDFs    | Private MinIO storage on EC2 with signed browser upload/download URLs              |
+| HTTPS          | Host Nginx reverse proxy and a Let's Encrypt certificate for the DuckDNS hostname  |
+| Website        | HTTPS on port 443; Next.js is bound to localhost on port 3000                      |
+| Storage access | HTTPS on port 9443; MinIO's HTTP API and management console are bound to localhost |
+| Delivery       | Image built on the developer's computer and streamed to EC2 over SSH               |
+
+The current demo uses **EC2-hosted PostgreSQL and MinIO**, rather than managed RDS or AWS S3. Terraform, ECR/SSM deployment, CloudWatch logging and GitHub Actions release configurations are provided for the managed-service deployment path; that path has not been verified as the live environment. CloudFront, ElastiCache, autoscaling and high availability are not active in the demo.
+
+EC2 container health checks and an HTTP 200 frontend response were confirmed during deployment; HTTPS reachability was subsequently confirmed by the owner. Complete browser-flow verification, certificate-renewal testing and load benchmarks must be recorded separately. Earlier [validation records](docs/validation.md) describe checks performed before this manual deployment and retain their historical limitations.
+
+The prebuilt-image setup uses `docker-compose.yml` plus `infrastructure/compose.demo.yml`. HTTPS configuration is applied last through `infrastructure/compose.https-demo.yml`, with host Nginx configured using `infrastructure/nginx-demo.conf.example`. The checked-in HTTPS templates use an IP placeholder; adapt the Nginx server name, certificate paths, `WEB_ORIGIN`, storage signing endpoint and MinIO origin to the hostname when deploying with a domain. Keep the exact browser origin consistent, including scheme and any nonstandard port.
+
+PostgreSQL, Redis and the MinIO console are not publicly exposed. Keep HTTP port 80 available for certificate validation and HTTP-to-HTTPS redirects. Configure and verify automatic certificate renewal and Nginx reloads before leaving the demo unattended. If EC2's public IP changes, update the DuckDNS record.
+
+For a future managed-service deployment, follow [First AWS deployment](docs/aws-first-deployment.md) and [Deployment and operations](docs/deployment.md).
 
 ## Local startup
 
-Prerequisites: Docker Engine with Compose v2.24+, at least 4 GB available memory, and access to container/package registries. Node **24 LTS** and pnpm 10.28 are needed only for host development.
+Prerequisites: Docker Engine with Compose v2.24.4+, at least 4 GB available memory, and access to container/package registries. Node **24 LTS** and pnpm 10.28 are needed only for host development.
 
 ```bash
 cd photoforge
@@ -18,7 +56,7 @@ cp .env.example .env
 docker compose up --build -d --wait --wait-timeout 300
 ```
 
-Open **http://localhost:3000** and choose **Take a look around** or **Explore the demo studio**. Guests get independent, private 24-hour accounts, with 50 books, 200 uploads and 100 exports per workspace. No shared demo identity or browser-only project storage is used.
+Open **http://localhost:3000** and choose **Take a look around** or **Try the creative studio**. Guests get independent, private 24-hour accounts, with 50 books, 200 uploads and 100 exports per workspace. No shared demo identity or browser-only project storage is used.
 
 - API and Swagger UI, through the frontend: http://localhost:3000/api/docs/
 - OpenAPI JSON: http://localhost:3000/api/docs/json
@@ -41,7 +79,7 @@ docker compose down -v
 
 Compose builds the shared image, waits for the database and Redis, creates a private local MinIO bucket and CORS configuration, runs the committed SQL migration and template seed, then starts the application. The local environment sets `NODE_ENV=development` so HTTP cookies work on localhost. Production sets secure cookies and requires HTTPS.
 
-Local MinIO uses a digest-pinned [Coollabs community build](https://github.com/coollabsio/minio/pkgs/container/minio/552228199?tag=RELEASE.2025-04-22T22-12-26Z), because the original `minio/minio` Docker Hub image is unavailable. This service is for local development; AWS deployment uses S3. If you have an older checkout that fails while pulling `minio/minio`, update the Compose image reference and run `docker compose pull minio` before retrying startup. No volume reset is needed.
+Local MinIO uses a digest-pinned [Coollabs community build](https://github.com/coollabsio/minio/pkgs/container/minio/552228199?tag=RELEASE.2025-04-22T22-12-26Z), because the original `minio/minio` Docker Hub image is unavailable. This service is used for local development and the temporary EC2 demo; the managed-service deployment configuration uses AWS S3. If you have an older checkout that fails while pulling `minio/minio`, update the Compose image reference and run `docker compose pull minio` before retrying startup. No volume reset is needed.
 
 The generated local `.env` is ignored by Git and excluded from Docker builds. `.env.example` contains placeholders, never production credentials.
 
@@ -60,7 +98,7 @@ The generated local `.env` is ignored by Git and excluded from Docker builds. `.
 | Delivery     | Docker Compose, GitHub Actions, AWS EC2/RDS/S3 configuration         |
 | Tests        | Jest, React Testing Library, Fastify inject, Playwright, k6 scenario |
 
-Node 24 is an LTS release ([official release schedule](https://github.com/nodejs/Release)). Package ranges satisfy Next.js 14+/React 18+ while targeting the newer Next.js 16/React 19 APIs, including asynchronous route parameters. Dependency versions and transitive compatibility must be resolved and verified before release.
+Node 24 is an LTS release ([official release schedule](https://github.com/nodejs/Release)). Package ranges satisfy Next.js 14+/React 18+ while targeting the newer Next.js 16/React 19 APIs, including asynchronous route parameters. The committed lockfile pins resolved dependencies. Compatibility checks and CI must pass for each release.
 
 ## Architecture
 
@@ -192,12 +230,14 @@ Next rewrites are compiled by `next build`; the internal hostname `api` is delib
 - [Performance targets versus measured results](docs/performance.md)
 - [Validation results and remaining gates](docs/validation.md)
 
-There is no Stripe integration, real payment collection, fulfillment, public file access, or claim of certified print production. No AWS infrastructure is created until a human explicitly authorizes and applies the configuration.
+Checkout is simulated: there is no Stripe integration, real payment collection or fulfillment. Stored photos and PDFs require authorization or signed URLs. Generated PDFs are not claimed to be certified print-production documents. The demo EC2 instance was created manually; repository workflows do not apply Terraform or automatically provision cloud resources.
 
 ## Known limitations and next work
 
-Complete the remaining production build and Docker/browser verification first. Then capture real screenshots, address browser findings, validate Terraform against the selected AWS account, and perform a separately approved deployment/smoke test.
+The application image has been built, transferred and started on EC2. Next, complete and record the browser workflow on the live hostname, verify automatic certificate renewal, capture real screenshots, and inspect downloaded PDFs. Run the integration and end-to-end suites against the intended release configuration. Validate Terraform and perform a separately approved deployment before claiming the RDS/S3/ECR/CloudWatch path is operational.
 
-The MVP uses single-instance EC2 and local persistent Redis, standard Latin PDF fonts, RGB output, simple rectangular crops, one active editor per document revision, and a bounded undo history. CMYK, ICC embedding, PDF/X certification, arbitrary Unicode fonts, collaborative editing, password recovery/email verification, malware scanning, automated member asset garbage collection, and real print fulfillment are not implemented. The canvas has keyboard controls and form labels, but still needs a screen-reader usability audit. A fully accessible non-canvas editing alternative remains future work.
+The temporary demo uses single-instance EC2, containerized PostgreSQL/MinIO and local persistent Redis, standard Latin PDF fonts, RGB output, simple rectangular crops, one active editor per document revision, and a bounded undo history. CMYK, ICC embedding, PDF/X certification, arbitrary Unicode fonts, collaborative editing, password recovery/email verification, malware scanning, automated member asset garbage collection, and real print fulfillment are not implemented. The canvas has keyboard controls and form labels, but still needs a screen-reader usability audit. A fully accessible non-canvas editing alternative remains future work.
+
+No measured throughput or production-traffic claim is made. The small demo server is not a capacity benchmark; it has limited disk space, memory and concurrency headroom, and no verified high-availability or off-instance backup setup.
 
 Marketing cover photographs are remote Unsplash illustrations; they are not silently inserted into user projects. Uploaded photos stay in private object storage. Replace marketing imagery with licensed locally hosted assets before a public production release if required by the intended distribution.

@@ -1,0 +1,17 @@
+# Temporary private demo using an image built on your computer.
+# Run from the repository root with docker-compose.yml as the first file.
+# Keep the base localhost-only ports; access them through SSH tunnels.
+x-prebuilt: &prebuilt
+  image: ${DEMO_IMAGE:-photoforge:demo}
+  pull_policy: never
+services:
+  storage-init:
+    <<: *prebuilt
+  migrate:
+    <<: *prebuilt
+  api:
+    <<: *prebuilt
+  worker:
+    <<: *prebuilt
+  web:
+    <<: *prebuilt

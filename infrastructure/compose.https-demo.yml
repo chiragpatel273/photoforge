@@ -1,0 +1,18 @@
+# Add last, after docker-compose.yml and compose.demo.yml.
+# Host Nginx terminates TLS on 443 (website) and 9443 (private S3 API).
+# DEMO_PUBLIC_IP must match the IP certificate and the EC2 public address.
+services:
+  api:
+    environment:
+      NODE_ENV: production
+      WEB_ORIGIN: https://${DEMO_PUBLIC_IP:?Set DEMO_PUBLIC_IP}
+      S3_PUBLIC_ENDPOINT: https://${DEMO_PUBLIC_IP:?Set DEMO_PUBLIC_IP}:9443
+  minio:
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: https://${DEMO_PUBLIC_IP:?Set DEMO_PUBLIC_IP}
+    ports: !override
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+  web:
+    ports: !override
+      - '127.0.0.1:3000:3000'

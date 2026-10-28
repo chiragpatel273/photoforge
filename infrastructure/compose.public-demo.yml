@@ -1,0 +1,16 @@
+# Temporary HTTP demo. Add after the base Compose file and compose.demo.yml.
+# Set DEMO_PUBLIC_IP in .env to the EC2 public IPv4 address (without a scheme).
+services:
+  api:
+    environment:
+      WEB_ORIGIN: http://${DEMO_PUBLIC_IP:?Set DEMO_PUBLIC_IP}:3000
+      S3_PUBLIC_ENDPOINT: http://${DEMO_PUBLIC_IP:?Set DEMO_PUBLIC_IP}:9000
+  minio:
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: http://${DEMO_PUBLIC_IP:?Set DEMO_PUBLIC_IP}:3000
+    ports: !override
+      - '0.0.0.0:9000:9000'
+      - '127.0.0.1:9001:9001'
+  web:
+    ports: !override
+      - '0.0.0.0:3000:3000'

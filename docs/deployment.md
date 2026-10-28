@@ -1,5 +1,7 @@
 # AWS deployment and operations
 
+For the ordered first-release walkthrough and configuration examples, start with [First AWS deployment](aws-first-deployment.md).
+
 ## Approval and status
 
 No AWS resources have been provisioned. The Terraform source is an opt-in deployment starting point and has not been validated/applied with Terraform or an AWS account in this environment. Do not run `terraform apply` until costs and changes are explicitly approved. EC2, EBS, public IPv4, RDS, Secrets Manager, logs, S3 and optional CloudFront incur charges. Multi-AZ and CloudFront default off; no NAT gateway, ALB, autoscaling group, or ElastiCache is provisioned for the initial instance.
