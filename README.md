@@ -155,6 +155,17 @@ The editor lays out logical coordinates on a 1000-unit-wide trim area. Page heig
 
 Actual screenshots have **not** been captured in this environment; no generated mockups are presented as running software. The Playwright workflow captures dashboard/editor/export screenshots under `test-results/` after reaching those screens. Run it against the real Compose stack, review the captures, and add approved images to `docs/screenshots/` for a portfolio release. CI retains these files as artifacts.
 
+## Demo video
+
+Record a captioned walkthrough of the actual guest, editor, image-processing, save/refresh, PDF-download and mock-checkout flows from your development computer:
+
+```bash
+pnpm exec playwright install chromium
+pnpm demo:record
+```
+
+Recordings are saved under `test-results/demo/`. WebM is captured by Playwright; an MP4 copy is created automatically when FFmpeg is installed. Supply `DEMO_PHOTO=/absolute/path/to/photo.jpg` to use your own sample photograph. See [recording setup, artifacts and verification limits](docs/demo-video.md). A completed video has not yet been captured or published from this environment.
+
 ## Formatting and readability
 
 Source files use two-space indentation, visible spacing between logical sections, and expanded JSX, object properties, and CSS rules. `.editorconfig` supplies editor defaults; `.prettierrc.json` defines the shared formatter settings.

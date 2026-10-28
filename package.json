@@ -23,7 +23,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "format:prisma": "prisma format",
-    "format:terraform": "terraform fmt -recursive infrastructure/aws"
+    "format:terraform": "terraform fmt -recursive infrastructure/aws",
+    "demo:record": "node scripts/record-demo.cjs"
   },
   "prisma": {
     "schema": "infrastructure/prisma/schema.prisma",

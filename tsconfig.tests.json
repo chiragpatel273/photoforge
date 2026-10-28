@@ -5,5 +5,5 @@
     "noEmit": true,
     "types": ["node", "jest"]
   },
-  "include": ["tests/**/*.ts", "tests/**/*.tsx"]
+  "include": ["tests/**/*.ts", "tests/**/*.tsx", "demos/**/*.ts", "demo.playwright.config.ts"]
 }
