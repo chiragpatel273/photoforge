@@ -4,7 +4,7 @@
 
 Create a private guest workspace, choose a template, upload photographs directly to object storage, arrange pages in a Konva editor, save a versioned document, and request a downloadable PDF. A deliberately simulated checkout records orders without collecting payment details or shipping products.
 
-**[Open the live demo](https://photoforge-chirag.duckdns.org)** · [Architecture](docs/architecture.md) · [API contracts](docs/api.md) · [Local setup](#local-startup)
+**[Open the live demo](https://photoforge-chirag.duckdns.org)** · [Demo video](#demo-video) · [Architecture](docs/architecture.md) · [API contracts](docs/api.md) · [Local setup](#local-startup)
 
 ## Try the demo
 
@@ -36,7 +36,7 @@ The running demo uses a manually configured, single-server deployment:
 
 The current demo uses **EC2-hosted PostgreSQL and MinIO**, rather than managed RDS or AWS S3. Terraform, ECR/SSM deployment, CloudWatch logging and GitHub Actions release configurations are provided for the managed-service deployment path; that path has not been verified as the live environment. CloudFront, ElastiCache, autoscaling and high availability are not active in the demo.
 
-EC2 container health checks and an HTTP 200 frontend response were confirmed during deployment; HTTPS reachability was subsequently confirmed by the owner. Complete browser-flow verification, certificate-renewal testing and load benchmarks must be recorded separately. Earlier [validation records](docs/validation.md) describe checks performed before this manual deployment and retain their historical limitations.
+EC2 container health checks and an HTTP 200 frontend response were confirmed during deployment. On October 28, 2026, the recorded Playwright workflow completed against the HTTPS hostname: guest sign-in, book creation, image processing, canvas editing, save/refresh, preview, PDF download and mock checkout. Successful run metadata and downloaded PDF headers were checked locally. This is a browser smoke test, not a throughput benchmark or a full production-readiness audit. Certificate-renewal testing and load benchmarks remain separate verification tasks. Earlier [validation records](docs/validation.md) describe checks performed before this manual deployment and retain their historical limitations.
 
 The prebuilt-image setup uses `docker-compose.yml` plus `infrastructure/compose.demo.yml`. HTTPS configuration is applied last through `infrastructure/compose.https-demo.yml`, with host Nginx configured using `infrastructure/nginx-demo.conf.example`. The checked-in HTTPS templates use an IP placeholder; adapt the Nginx server name, certificate paths, `WEB_ORIGIN`, storage signing endpoint and MinIO origin to the hostname when deploying with a domain. Keep the exact browser origin consistent, including scheme and any nonstandard port.
 
@@ -153,18 +153,39 @@ The editor lays out logical coordinates on a 1000-unit-wide trim area. Page heig
 
 ## Screenshots
 
-Actual screenshots have **not** been captured in this environment; no generated mockups are presented as running software. The Playwright workflow captures dashboard/editor/export screenshots under `test-results/` after reaching those screens. Run it against the real Compose stack, review the captures, and add approved images to `docs/screenshots/` for a portfolio release. CI retains these files as artifacts.
+Actual editor, preview and export screenshots have been captured from the live application alongside the successful demo recordings. They are stored in each run directory under `test-results/demo/`. The regular end-to-end test also captures dashboard/editor/export screenshots under `test-results/`. Generated artifacts are Git-ignored; review and copy selected screenshots to `docs/screenshots/` before adding repository image links. No generated mockups are presented as running software.
 
 ## Demo video
 
-Record a captioned walkthrough of the actual guest, editor, image-processing, save/refresh, PDF-download and mock-checkout flows from your development computer:
+A complete demo video has been generated from the live AWS application. It records actual browser interactions and processing time, with explanatory captions; it is not a slideshow. The current recorder has no pointer/click overlays, narration or background music.
+
+The walkthrough covers guest sign-in, template selection, image upload/processing, canvas and text editing, undo/redo, save/refresh persistence, page preview, queued PDF export/download, and a confirmed mock order. The default sample image is a generated landscape illustration; it is not presented as a real photograph.
+
+To record a new video on your development computer:
 
 ```bash
 pnpm exec playwright install chromium
+# On Linux/WSL, if required browser libraries are missing:
+pnpm exec playwright install-deps chromium
 pnpm demo:record
 ```
 
-Recordings are saved under `test-results/demo/`. WebM is captured by Playwright; an MP4 copy is created automatically when FFmpeg is installed. Supply `DEMO_PHOTO=/absolute/path/to/photo.jpg` to use your own sample photograph. See [recording setup, artifacts and verification limits](docs/demo-video.md). A completed video has not yet been captured or published from this environment.
+Use your own non-sensitive sample photograph:
+
+```bash
+DEMO_PHOTO=/absolute/path/to/photo.jpg pnpm demo:record
+```
+
+Each run is saved under `test-results/demo/<timestamp>/`:
+
+| Artifact                                         | Purpose                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `photoforge-demo.webm`                           | Completed captioned browser video                            |
+| `photoforge-demo.mp4`                            | Converted video, when FFmpeg with H.264 support is installed |
+| Nested `editor.png`, `preview.png`, `export.png` | Screenshots of the real application                          |
+| Nested `photoforge-demo.pdf` and `workflow.json` | Downloaded PDF and completed-workflow record                 |
+
+Failed runs retain a `.partial.webm` recording when available and exit unsuccessfully. Output files are Git-ignored, and no public video-hosting link has been added yet. Review a completed recording before uploading it and linking it here. Existing videos are not changed when the recorder is edited. See [recording setup and troubleshooting](docs/demo-video.md).
 
 ## Formatting and readability
 
@@ -245,7 +266,7 @@ Checkout is simulated: there is no Stripe integration, real payment collection o
 
 ## Known limitations and next work
 
-The application image has been built, transferred and started on EC2. Next, complete and record the browser workflow on the live hostname, verify automatic certificate renewal, capture real screenshots, and inspect downloaded PDFs. Run the integration and end-to-end suites against the intended release configuration. Validate Terraform and perform a separately approved deployment before claiming the RDS/S3/ECR/CloudWatch path is operational.
+The application is running on EC2, and the recorded browser workflow has completed against its HTTPS hostname with screenshots and a downloaded PDF. Next, publish a reviewed demo video and selected screenshots, verify automatic certificate renewal, and inspect PDF page dimensions and print details beyond the existing header check. Run the full integration and end-to-end suites against the intended release configuration. Validate Terraform and perform a separately approved deployment before claiming the RDS/S3/ECR/CloudWatch path is operational.
 
 The temporary demo uses single-instance EC2, containerized PostgreSQL/MinIO and local persistent Redis, standard Latin PDF fonts, RGB output, simple rectangular crops, one active editor per document revision, and a bounded undo history. CMYK, ICC embedding, PDF/X certification, arbitrary Unicode fonts, collaborative editing, password recovery/email verification, malware scanning, automated member asset garbage collection, and real print fulfillment are not implemented. The canvas has keyboard controls and form labels, but still needs a screen-reader usability audit. A fully accessible non-canvas editing alternative remains future work.
 

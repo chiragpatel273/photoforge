@@ -77,7 +77,9 @@ Captions explain the RGB/CMYK limitation and simulated checkout. The recorder le
 
 ## Verification status
 
-The recording configuration, TypeScript and lint are checked locally. A finished video was **not produced in the coding-agent environment**: its Chromium binary is absent and outbound socket connections are denied. Running `pnpm demo:record` on the developer's machine is required to verify selectors and the entire live workflow and produce the actual artifact.
+The recording configuration, TypeScript and lint have been checked locally. The developer successfully ran the recorder against the live HTTPS application on October 28, 2026. Completed workflow metadata, passing run status, screenshots, a WebM video and downloaded PDFs are present in the local output directories; the PDF headers were checked. The current recorder uses captions without pointer or click overlays. A fresh run is needed to capture subsequent application or recorder changes.
+
+The coding-agent sandbox still cannot launch Chromium or connect to the live host, so browser recording is run from the developer's terminal. Successful recording does not substitute for load testing, certificate-renewal testing or print-production validation. The video has not been published to a public hosting service by the coding agent.
 
 ## Diagnosing a recording timeout
 
